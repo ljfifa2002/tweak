@@ -9,14 +9,30 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    permissions:
+      contents: write  # needed to create GitHub Release
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Theos
-        uses: theosorg/theos-action@v2
-        with:
-          theos-sdks: 'https://github.com/theos/sdks'
+        run: |
+          export THEOS=~/theos
+          echo "THEOS=$THEOS" >> $GITHUB_ENV
+
+          # Clone Theos
+          git clone --recursive https://github.com/theos/theos.git $THEOS
+
+          # Download prebuilt iOS SDKs (theos/sdks releases)
+          curl -fsSL https://github.com/theos/sdks/archive/refs/heads/master.zip -o /tmp/sdks.zip
+          unzip -q /tmp/sdks.zip -d /tmp/sdks-extracted
+          mv /tmp/sdks-extracted/sdks-master/*.sdk $THEOS/sdks/
+
+          # Install ldid for code signing
+          brew install ldid 2>/dev/null || true
+
+          echo "[*] Theos ready at $THEOS"
+          ls $THEOS/sdks/
 
       - name: Build dylib
         run: |
