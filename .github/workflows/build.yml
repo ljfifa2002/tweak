@@ -1,0 +1,65 @@
+name: Build MonitorTweak
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Theos
+        uses: theosorg/theos-action@v2
+        with:
+          theos-sdks: 'https://github.com/theos/sdks'
+
+      - name: Build dylib
+        run: |
+          make clean
+          make FINALPACKAGE=1 DEBUG=0
+
+      - name: Locate dylib
+        id: locate
+        run: |
+          DYLIB=$(find .theos/obj -name "MonitorTweak.dylib" | head -1)
+          echo "path=$DYLIB" >> $GITHUB_OUTPUT
+          echo "Found: $DYLIB"
+          ls -lh "$DYLIB"
+
+      # Wrap in zip before uploading so that extraction on Windows preserves
+      # the original build timestamp (direct .dylib download resets mtime).
+      - name: Package dylib as zip
+        id: package
+        run: |
+          DYLIB="${{ steps.locate.outputs.path }}"
+          ZIP="MonitorTweak.zip"
+          # -X: no extra attributes  -j: junk path (file only, no subdirs)
+          zip -X -j "$ZIP" "$DYLIB"
+          echo "zip=$ZIP" >> $GITHUB_OUTPUT
+          ls -lh "$ZIP"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MonitorTweak-${{ github.ref_name }}
+          path: ${{ steps.package.outputs.zip }}
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.package.outputs.zip }}
+          name: MonitorTweak ${{ github.ref_name }}
+          body: |
+            MonitorTweak dylib for pecker-agent iOS Tweak mode.
+
+            ## Install
+            Download `MonitorTweak.zip`, extract to get `MonitorTweak.dylib`,
+            then set `ios.tweak_dylib_path` in relay config.
+
+            The zip preserves the build timestamp — do not rename or re-zip the dylib.

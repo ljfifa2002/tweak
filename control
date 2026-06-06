@@ -1,0 +1,9 @@
+Package: com.pecker.monitortweak
+Name: MonitorTweak
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: pecker-agent iOS privacy monitor tweak
+Maintainer: pecker
+Author: pecker
+Section: Tweaks
+Depends: mobilesubstrate

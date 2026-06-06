@@ -1,0 +1,3 @@
+# Placeholder — pecker-agent deployer writes the actual bundle filter
+# before uploading to the device. This file is not used by CI.
+{ Filter = { Bundles = ( "com.example.placeholder" ); }; }
