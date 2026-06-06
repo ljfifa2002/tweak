@@ -4,7 +4,7 @@ TARGET = iphone:clang:latest:15.0
 include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = MonitorTweak
-MonitorTweak_FILES = Tweak.x MonitorFiles.x SocketReporter.m
+MonitorTweak_FILES = Tweak.x MonitorFiles.x SocketReporter.m RestoreSymbol.m
 MonitorTweak_FRAMEWORKS = Foundation UIKit CoreLocation Contacts Photos \
                            AVFoundation AdSupport CoreTelephony
 MonitorTweak_CFLAGS = -fobjc-arc -fvisibility=hidden

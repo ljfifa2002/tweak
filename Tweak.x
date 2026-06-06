@@ -1,4 +1,5 @@
 #import "SocketReporter.h"
+#import "RestoreSymbol.h"
 #import <substrate.h>
 #import <Security/Security.h>
 #import <UIKit/UIKit.h>
@@ -15,18 +16,20 @@
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 static NSString *captureStack(void) {
-    NSArray *frames = [NSThread callStackSymbols];
-    NSMutableArray *filtered = [NSMutableArray arrayWithCapacity:20];
-    NSArray *skip = @[@"MonitorTweak", @"SocketReporter", @"libdispatch"];
-    for (NSString *f in frames) {
-        BOOL ignored = NO;
-        for (NSString *kw in skip) {
-            if ([f rangeOfString:kw].location != NSNotFound) { ignored = YES; break; }
-        }
-        if (!ignored) [filtered addObject:f];
-        if (filtered.count >= 20) break;
+    RestoreSymbol *rs = [[RestoreSymbol alloc] init];
+    NSMutableArray *frames = [rs outputCallStackSymbol];
+    NSMutableArray *filtered = [NSMutableArray array];
+    for (id item in frames) {
+        if (![item isKindOfClass:[NSString class]]) continue;
+        NSString *f = (NSString *)item;
+        if ([f isEqualToString:@"null"] || f.length == 0) continue;
+        if ([f containsString:@"MonitorTweak"] ||
+            [f containsString:@"SocketReporter"] ||
+            [f containsString:@"RestoreSymbol"]) continue;
+        [filtered addObject:f];
+        if (filtered.count >= 15) break;
     }
-    return [filtered componentsJoinedByString:@"\n"];
+    return filtered.count > 0 ? [filtered componentsJoinedByString:@"\n"] : @"";
 }
 
 static long long msNow(void) {
