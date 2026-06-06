@@ -9,6 +9,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <CoreTelephony/CTTelephonyNetworkInfo.h>
 #import <CoreTelephony/CTCarrier.h>
+#import <mach-o/dyld.h>
 #import <dlfcn.h>
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
