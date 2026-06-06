@@ -51,30 +51,30 @@
             continue;
         }
         NSString *strName = [NSString stringWithCString:selName encoding:NSUTF8StringEncoding];
-        NSString *strImp = [NSString stringWithFormat:@"%ld", imp];
-        
+        NSString *strImp = [NSString stringWithFormat:@"%lu", (uintptr_t)imp];
+
         //NSLog(@"%@",strName);
         NSDictionary *dic = [NSDictionary dictionaryWithObjectsAndKeys:
                              strName,@"name",
                              strImp,@"imp",
                              @"-", @"type",
                              nil];
-        
+
         [arrayMethodName addObject:dic];
     }
-    
+
     Method *metaMethods = class_copyMethodList(metaClass, &count);
     for (int i =0; i<count; i++)
     {
         SEL name = method_getName(metaMethods[i]);
         const char *selName= sel_getName(name);
         IMP imp = method_getImplementation(metaMethods[i]);
-        
+
         if (!selName) {
             continue;
         }
         NSString *strName = [NSString stringWithCString:selName encoding:NSUTF8StringEncoding];
-        NSString *strImp = [NSString stringWithFormat:@"%ld", imp];
+        NSString *strImp = [NSString stringWithFormat:@"%lu", (uintptr_t)imp];
         
         NSDictionary *dic = [NSDictionary dictionaryWithObjectsAndKeys:
                              strName,@"name",
@@ -134,7 +134,7 @@
     
     int ret;
     Dl_info dylib_info;
-    if ((ret = dladdr(addr, &dylib_info))) {
+    if ((ret = dladdr((const void *)(uintptr_t)addr, &dylib_info))) {
        
         const char *fname = dylib_info.dli_fname;
         void *fbase = dylib_info.dli_fbase;
@@ -175,10 +175,10 @@
     unsigned int c_size = 0;
     const char **allClasses = (const char **)objc_copyClassNamesForImage(path, &c_size);
     
-    NSString *c_size_str = [@(c_size) stringValue];
-    uintptr_t tmpDis = 0;
+    NSString *c_size_str __attribute__((unused)) = [@(c_size) stringValue];
+    uintptr_t tmpDis __attribute__((unused)) = 0;
     uintptr_t theDistance = 0xffffffffffffffff;
-    uintptr_t theIMP = 0;
+    uintptr_t theIMP __attribute__((unused)) = 0;
     NSString* theMethodName = nil;
     NSString* theClassName = nil;
     NSString* theMetholdType = nil;
@@ -238,7 +238,7 @@
     NSMutableString* retStr = [NSMutableString string];
     
     if ((!theDistance) || (!theMetholdType) || (!theClassName) || (!theMethodName)) {
-        return @"null";
+        return [NSMutableString stringWithString:@"null"];
     }
     
     NSString *moduleName = [module_path lastPathComponent];
@@ -270,7 +270,8 @@
         
         NSString *symbolInfo = [stackSymbols objectAtIndex:i];
         
-        NSString *frameNum, *moduleName, *symbolAddr, *symbolName;
+        NSString *frameNum __attribute__((unused)), *moduleName __attribute__((unused)),
+                 *symbolAddr, *symbolName __attribute__((unused));
         frameNum = [symbolInfo substringToIndex:1];
         //NSLog(@"frameNum: %@", frameNum);
         
