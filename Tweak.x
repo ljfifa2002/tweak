@@ -197,6 +197,26 @@ static int new_ptrace(int req, pid_t pid, caddr_t addr, int data) {
 }
 %end
 
+// Actual-use hooks: permission requests only fire on first grant; these catch the
+// real recording/camera operation on every use (after the permission persists).
+%hook AVAudioRecorder
+- (BOOL)record {
+    reportBehavior(@"AVAudioRecorder.record", @"");
+    return %orig;
+}
+- (BOOL)recordForDuration:(NSTimeInterval)d {
+    reportBehavior(@"AVAudioRecorder.record", @"");
+    return %orig;
+}
+%end
+
+%hook AVCaptureSession
+- (void)startRunning {
+    reportBehavior(@"AVCaptureSession.startRunning", @"");
+    %orig;
+}
+%end
+
 // ── Photos ────────────────────────────────────────────────────────────────────
 
 %hook PHPhotoLibrary
