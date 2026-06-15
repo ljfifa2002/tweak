@@ -6,7 +6,7 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = MonitorTweak
 MonitorTweak_FILES = Tweak.x MonitorFiles.x SocketReporter.m RestoreSymbol.m
 MonitorTweak_FRAMEWORKS = Foundation UIKit CoreLocation Contacts Photos \
-                           AVFoundation AdSupport CoreTelephony
+                           AVFoundation AdSupport CoreTelephony WebKit
 MonitorTweak_CFLAGS = -fobjc-arc -fvisibility=hidden
 MonitorTweak_LDFLAGS = -lsubstrate
 MonitorTweak_CODESIGN_FLAGS = -Sentitlements.plist

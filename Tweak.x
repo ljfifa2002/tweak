@@ -3,6 +3,7 @@
 #import <substrate.h>
 #import <Security/Security.h>
 #import <UIKit/UIKit.h>
+#import <WebKit/WebKit.h>
 #import <AdSupport/AdSupport.h>
 #import <CoreLocation/CoreLocation.h>
 #import <Contacts/Contacts.h>
@@ -234,6 +235,22 @@ static int new_ptrace(int req, pid_t pid, caddr_t addr, int data) {
 }
 %end
 
+// Actual album reads — permission requests moved to the `permissions` flag, so these
+// keep `readalbum` covered: enumerating the library + loading a photo's pixels.
+%hook PHAsset
++ (PHFetchResult *)fetchAssetsWithMediaType:(PHAssetMediaType)mediaType options:(PHFetchOptions *)options {
+    reportBehavior(@"PHAsset.fetchAssets", @"");
+    return %orig;
+}
+%end
+
+%hook PHImageManager
+- (PHImageRequestID)requestImageForAsset:(PHAsset *)asset targetSize:(CGSize)targetSize contentMode:(PHImageContentMode)contentMode options:(PHImageRequestOptions *)options resultHandler:(id)resultHandler {
+    reportBehavior(@"PHImageManager.requestImageForAsset", @"");
+    return %orig;
+}
+%end
+
 // ── Clipboard ─────────────────────────────────────────────────────────────────
 
 %hook _UIConcretePasteboard
@@ -381,6 +398,120 @@ static void runSDKDetection(void) {
     });
 }
 
+// ── Privacy policy capture (A: WKWebView innerText, B: native view-tree text) ──
+// Extracted on-device and pushed as a "privacy_policy" message (frida.Message
+// shape); pecker-agent's inspector enqueues it straight to the upload pipeline.
+// source distinguishes the two plans: webview_js / native_view.
+
+static const NSUInteger kPrivacyMinChars     = 200;     // ignore short blobs (buttons/toasts)
+static const long long  kPrivacyNativeWindow = 120000;  // only walk native views for 120s after launch
+static long long        gPrivacyLaunchMs     = 0;
+static NSMutableSet     *gPrivacySeen         = nil;     // dedup by content prefix
+
+static BOOL looksLikePrivacy(NSString *s) {
+    if (!s.length) return NO;
+    static NSArray *kw;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        kw = @[@"隐私", @"隐私政策", @"用户协议", @"服务协议", @"用户服务协议",
+               @"privacy", @"agreement", @"policy"];
+    });
+    for (NSString *k in kw) {
+        if ([s rangeOfString:k options:NSCaseInsensitiveSearch].location != NSNotFound) return YES;
+    }
+    return NO;
+}
+
+static BOOL privacyAlreadyReported(NSString *content) {
+    NSString *key = content.length > 80 ? [content substringToIndex:80] : content;
+    @synchronized (gPrivacySeen) {
+        if ([gPrivacySeen containsObject:key]) return YES;
+        [gPrivacySeen addObject:key];
+    }
+    return NO;
+}
+
+static void reportPrivacy(NSString *source, NSString *url, NSString *text) {
+    if (text.length < kPrivacyMinChars) return;
+    if (privacyAlreadyReported(text)) return;
+    [[SocketReporter shared] sendDict:@{
+        @"type":      @"privacy_policy",
+        @"method":    source ?: @"",
+        @"url":       url ?: @"",
+        @"data":      text,
+        @"timestamp": @(msNow()),
+    }];
+}
+
+// collectViewText walks a view subtree gathering UILabel / UITextView text.
+static void collectViewText(UIView *v, NSMutableString *out, int depth) {
+    if (!v || depth > 40 || out.length > 200000) return;
+    if ([v isKindOfClass:[UILabel class]]) {
+        NSString *t = ((UILabel *)v).text;
+        if (t.length) { [out appendString:t]; [out appendString:@"\n"]; }
+    } else if ([v isKindOfClass:[UITextView class]]) {
+        NSString *t = ((UITextView *)v).text;
+        if (t.length) { [out appendString:t]; [out appendString:@"\n"]; }
+    }
+    for (UIView *sub in v.subviews) collectViewText(sub, out, depth + 1);
+}
+
+// A: hook WKWebView; on a privacy-looking load, pull innerText after render settles.
+%hook WKWebView
+- (WKNavigation *)loadRequest:(NSURLRequest *)request {
+    WKNavigation *nav = %orig;
+    NSString *url = request.URL.absoluteString ?: @"";
+    if (looksLikePrivacy(url)) {
+        __weak WKWebView *wself = self;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            WKWebView *sv = wself;
+            if (!sv) return;
+            [sv evaluateJavaScript:@"document.body ? document.body.innerText : ''"
+                completionHandler:^(id result, NSError *error) {
+                    if ([result isKindOfClass:[NSString class]])
+                        reportPrivacy(@"webview_js", url, (NSString *)result);
+                }];
+        });
+    }
+    return nav;
+}
+- (WKNavigation *)loadHTMLString:(NSString *)string baseURL:(NSURL *)baseURL {
+    WKNavigation *nav = %orig;
+    if (looksLikePrivacy(string)) {
+        __weak WKWebView *wself = self;
+        NSString *url = baseURL.absoluteString ?: @"";
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            WKWebView *sv = wself;
+            if (!sv) return;
+            [sv evaluateJavaScript:@"document.body ? document.body.innerText : ''"
+                completionHandler:^(id result, NSError *error) {
+                    if ([result isKindOfClass:[NSString class]])
+                        reportPrivacy(@"webview_js", url, (NSString *)result);
+                }];
+        });
+    }
+    return nav;
+}
+%end
+
+// B: hook UIViewController; during the launch window scan native view text for a
+// privacy agreement (the common first-launch dialog). Time-boxed + deduped so the
+// hot viewDidAppear path stays cheap.
+%hook UIViewController
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    if (gPrivacyLaunchMs == 0 || msNow() - gPrivacyLaunchMs > kPrivacyNativeWindow) return;
+    UIView *root = self.view;
+    if (!root) return;
+    NSMutableString *buf = [NSMutableString string];
+    collectViewText(root, buf, 0);
+    if (buf.length >= kPrivacyMinChars && looksLikePrivacy(buf))
+        reportPrivacy(@"native_view", @"", buf);
+}
+%end
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 %ctor {
@@ -388,6 +519,10 @@ static void runSDKDetection(void) {
 
     // Start TCP server immediately (pure POSIX, no ObjC runtime needed)
     [[SocketReporter shared] startServer];
+
+    // Privacy capture state (A/B): dedup set + launch timestamp for the native window.
+    gPrivacySeen     = [NSMutableSet set];
+    gPrivacyLaunchMs = msNow();
 
     // ptrace bypass
     MSHookFunction((void *)MSFindSymbol(NULL, "_ptrace"),
