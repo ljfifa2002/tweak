@@ -443,6 +443,19 @@ static void reportPrivacy(NSString *source, NSString *url, NSString *text) {
     }];
 }
 
+// Report a privacy-looking page URL (frida.Message "webview_privacy_url") so
+// pecker-agent can fetch the text as a fallback (Plan C) when the on-device
+// innerText / native-view capture is missing or too short. HTTP(S) only — Plan
+// C fetches over the network, so file://about: base URLs are useless.
+static void reportPrivacyURL(NSString *url) {
+    if (![url hasPrefix:@"http"]) return;
+    [[SocketReporter shared] sendDict:@{
+        @"type":      @"webview_privacy_url",
+        @"url":       url,
+        @"timestamp": @(msNow()),
+    }];
+}
+
 // collectViewText walks a view subtree gathering UILabel / UITextView text.
 static void collectViewText(UIView *v, NSMutableString *out, int depth) {
     if (!v || depth > 40 || out.length > 200000) return;
@@ -462,6 +475,7 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
     WKNavigation *nav = %orig;
     NSString *url = request.URL.absoluteString ?: @"";
     if (looksLikePrivacy(url)) {
+        reportPrivacyURL(url);   // Plan C fallback fuel for pecker-agent
         __weak WKWebView *wself = self;
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
@@ -481,6 +495,7 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
     if (looksLikePrivacy(string)) {
         __weak WKWebView *wself = self;
         NSString *url = baseURL.absoluteString ?: @"";
+        reportPrivacyURL(url);   // Plan C fuel (no-op unless baseURL is http(s))
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
             WKWebView *sv = wself;
