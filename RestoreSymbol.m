@@ -227,6 +227,11 @@ static NSString *symbolicate(uintptr_t addr) {
     if (strstr(path, "MonitorTweak")) return nil;
 
     NSString *mod = [[NSString stringWithUTF8String:path] lastPathComponent];
+    // The main executable's name is constant on every app-code frame (the
+    // "<exe>`" prefix), with no analog in the APK trace where the class name
+    // self-identifies. Drop it for the main binary; keep it for app-bundled
+    // SDK/framework dylibs, where the module is the only image identifier.
+    BOOL isMain = ((const struct mach_header_64 *)info.dli_fbase)->filetype == MH_EXECUTE;
 
     NSString *result = nil;
     os_unfair_lock_lock(&gLock);
@@ -246,18 +251,26 @@ static NSString *symbolicate(uintptr_t addr) {
             while (lo < hi) { size_t mid = (lo + hi) / 2; if (ic->ents[mid].imp <= addr) lo = mid + 1; else hi = mid; }
             if (lo > 0) {
                 SymEnt *e = &ic->ents[lo - 1];
-                if (addr - e->imp <= MAX_SYM_OFFSET)
-                    result = [NSString stringWithFormat:@"%@`%s + %lu", mod, e->sym, (unsigned long)(addr - e->imp)];
+                if (addr - e->imp <= MAX_SYM_OFFSET) {
+                    unsigned long off = (unsigned long)(addr - e->imp);
+                    result = isMain
+                        ? [NSString stringWithFormat:@"%s + %lu", e->sym, off]
+                        : [NSString stringWithFormat:@"%@`%s + %lu", mod, e->sym, off];
+                }
             }
         }
     }
     os_unfair_lock_unlock(&gLock);
     if (result) return result;
 
-    // Fallbacks: nearest exported symbol, else module + offset.
-    if (info.dli_sname && info.dli_saddr)
-        return [NSString stringWithFormat:@"%@`%s + %lu", mod, info.dli_sname,
-                          (unsigned long)(addr - (uintptr_t)info.dli_saddr)];
+    // Fallbacks: nearest exported symbol, else module + offset (the latter keeps
+    // the module even for the main binary — a bare "+ N" would identify nothing).
+    if (info.dli_sname && info.dli_saddr) {
+        unsigned long off = (unsigned long)(addr - (uintptr_t)info.dli_saddr);
+        return isMain
+            ? [NSString stringWithFormat:@"%s + %lu", info.dli_sname, off]
+            : [NSString stringWithFormat:@"%@`%s + %lu", mod, info.dli_sname, off];
+    }
     return [NSString stringWithFormat:@"%@ + %lu", mod, (unsigned long)(addr - (uintptr_t)info.dli_fbase)];
 }
 
