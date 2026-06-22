@@ -24,9 +24,8 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
-	"io"
 	"os"
 )
 
@@ -57,11 +56,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	iv := make([]byte, 16)
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		fmt.Fprintf(os.Stderr, "rng: %v\n", err)
-		os.Exit(1)
-	}
+	// Deterministic IV = SHA-256(plaintext)[:16]: unique per distinct rules content
+	// (CTR-safe -- a (key,IV) pair only repeats when the plaintext is identical, in
+	// which case the ciphertext is identical too), and makes regeneration idempotent
+	// so re-running on unchanged rules yields a byte-identical header (no git churn).
+	sum := sha256.Sum256(plain)
+	iv := sum[:16]
 	ct := make([]byte, len(plain))
 	ctrXor(ct, plain, iv)
 
