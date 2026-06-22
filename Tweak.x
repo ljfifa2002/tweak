@@ -13,6 +13,8 @@
 #import <CoreTelephony/CTCarrier.h>
 #import <mach-o/dyld.h>
 #import <dlfcn.h>
+#import <CommonCrypto/CommonCrypto.h>
+#import "SDKRulesData.h"
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -329,14 +331,47 @@ static int new_ptrace(int req, pid_t pid, caddr_t addr, int data) {
 }
 %end
 
-// ── SDK detection (3 s delay, reads /var/mobile/monitor_sdk_rules.json) ────────
+// ── SDK detection (3 s delay; rules embedded in the dylib, AES-256-CTR) ────────
+
+// AES-256-CTR decrypt of a [16-byte IV][ciphertext] blob using CommonCrypto.
+// kCCModeOptionCTR_BE = big-endian counter starting at the IV, matching the
+// Go cipher.NewCTR used by tools/gen_sdk_header.go.
+static NSData *aesCtrDecrypt(const uint8_t *key, const uint8_t *blob, size_t blobLen) {
+    if (blobLen <= 16) return nil;
+    const uint8_t *iv = blob;
+    const uint8_t *ct = blob + 16;
+    size_t ctLen = blobLen - 16;
+
+    CCCryptorRef cryptor = NULL;
+    if (CCCryptorCreateWithMode(kCCDecrypt, kCCModeCTR, kCCAlgorithmAES, ccNoPadding,
+                                iv, key, kCCKeySizeAES256, NULL, 0, 0,
+                                kCCModeOptionCTR_BE, &cryptor) != kCCSuccess) {
+        return nil;
+    }
+    NSMutableData *out = [NSMutableData dataWithLength:ctLen];
+    size_t moved = 0;
+    CCCryptorStatus s = CCCryptorUpdate(cryptor, ct, ctLen, out.mutableBytes, ctLen, &moved);
+    CCCryptorRelease(cryptor);
+    if (s != kCCSuccess) return nil;
+    out.length = moved;
+    return out;
+}
+
+// Returns the SDK-rules JSON. A loose /var/mobile/monitor_sdk_rules.json wins
+// when present (dev override: test new rules without rebuilding the dylib);
+// production no longer ships that file (the agent stopped pushing it), so the
+// AES-encrypted copy embedded in the dylib is used instead.
+static NSData *loadSDKRules(void) {
+    NSData *f = [NSData dataWithContentsOfFile:@"/var/mobile/monitor_sdk_rules.json"];
+    if (f) return f;
+    return aesCtrDecrypt(kSDKRulesKey, kSDKRulesBlob, kSDKRulesBlobLen);
+}
 
 static void runSDKDetection(void) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC),
                    dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-        NSString *path = @"/var/mobile/monitor_sdk_rules.json";
-        NSData   *data = [NSData dataWithContentsOfFile:path];
-        if (!data) { NSLog(@"[MonitorTweak] sdk rules not found"); return; }
+        NSData *data = loadSDKRules();
+        if (!data) { NSLog(@"[MonitorTweak] sdk rules unavailable"); return; }
         NSArray *rules = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
         if (![rules isKindOfClass:[NSArray class]]) return;
 
