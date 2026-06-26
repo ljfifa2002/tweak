@@ -96,4 +96,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Done. CI will build MonitorTweak at ref=$nextTag and publish MonitorTweak.zip."
-Write-Host "After it finishes: run  tools\update-tweak.ps1  in pecker-agent to pull the dylib."
+Write-Host "After it finishes: run  tools\update-tweak.cmd  in pecker-agent to pull the dylib."
