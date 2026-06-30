@@ -40,9 +40,24 @@ static long long msNow(void) {
 }
 
 // Build a behavior message compatible with frida.Message JSON shape.
+// Hooks listed here are completely silenced — neither reported nor logged.
+// Add a method key (matching behavior_ios.json) to disable a hook without removing its %hook block.
+static NSSet *behaviorBlacklist(void) {
+    static NSSet *s;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        s = [NSSet setWithObjects:
+            @"CTTelephonyNetworkInfo.subscriberCellularProvider",
+            @"CTTelephonyNetworkInfo.serviceSubscriberCellularProviders",
+            nil];
+    });
+    return s;
+}
+
 // method must match a key in behavior_ios.json; lookupBehavior in inspector.go
 // resolves privacyFlag and desc from config — no flag needed here.
 static void reportBehavior(NSString *method, NSString *data) {
+    if ([behaviorBlacklist() containsObject:method]) return;
     [[SocketReporter shared] sendDict:@{
         @"type":        @"behavior",
         @"method":      method ?: @"",
