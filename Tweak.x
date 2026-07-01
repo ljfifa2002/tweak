@@ -52,6 +52,9 @@ static NSSet *behaviorBlacklist(void) {
             @"NSFileHandle.write",
             @"NSData.write",
             @"NSFileManager.write",
+            @"NSFileHandle.read",
+            @"NSData.read",
+            @"NSFileManager.read",
             nil];
     });
     return s;
