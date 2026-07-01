@@ -22,6 +22,8 @@ static long long msNow2(void) {
 
 static void reportFile(NSString *method, NSString *path, NSString *flag) {
     if (!isAppPath(path)) return;
+    // Write hooks disabled — high-frequency cache writes degrade WDA responsiveness.
+    if ([flag isEqualToString:@"writesdcard"]) return;
     [[SocketReporter shared] sendDict:@{
         @"type":        @"behavior",
         @"method":      method,

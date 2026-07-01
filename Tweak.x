@@ -49,6 +49,9 @@ static NSSet *behaviorBlacklist(void) {
         s = [NSSet setWithObjects:
             @"CTTelephonyNetworkInfo.subscriberCellularProvider",
             @"CTTelephonyNetworkInfo.serviceSubscriberCellularProviders",
+            @"NSFileHandle.write",
+            @"NSData.write",
+            @"NSFileManager.write",
             nil];
     });
     return s;
