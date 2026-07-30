@@ -598,4 +598,12 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
 
     // 测试：不调用任何其他代码
     syslog(LOG_NOTICE, "[MonitorTweak] ctor completed");
+
+    // 避免 unused 警告
+    (void)new_ptrace;
+    (void)new_SecItemCopyMatching;
+    (void)new_SecItemAdd;
+    (void)new_SecItemUpdate;
+    (void)new_SecItemDelete;
+    (void)runSDKDetection;
 }
