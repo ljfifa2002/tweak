@@ -587,17 +587,13 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 %ctor {
-    // 只使用 syslog，不使用 NSLog 或 fprintf
+    // 先测试 syslog，不使用 NSLog
     syslog(LOG_NOTICE, "[MonitorTweak] ctor line 1");
     syslog(LOG_NOTICE, "[MonitorTweak] ctor line 2");
     syslog(LOG_NOTICE, "[MonitorTweak] ctor line 3");
 
-    NSLog(@"[MonitorTweak] loaded into %@", [[NSBundle mainBundle] bundleIdentifier]);
-
-    syslog(LOG_NOTICE, "[MonitorTweak] after NSLog with bundle ID");
-
-    // 测试：不调用任何其他代码
-    syslog(LOG_NOTICE, "[MonitorTweak] ctor completed");
+    // 最后才使用 NSLog
+    NSLog(@"[MonitorTweak] loaded into tv.danmaku.bilianime");
 
     // 避免 unused 警告
     (void)new_ptrace;
