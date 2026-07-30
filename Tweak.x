@@ -586,42 +586,15 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 %ctor {
-    NSLog(@"[MonitorTweak] === CTOR START ===");
+    NSLog(@"[MonitorTweak] === CTOR LINE 1 ===");
+    NSLog(@"[MonitorTweak] === CTOR LINE 2 ===");
+    NSLog(@"[MonitorTweak] === CTOR LINE 3 ===");
+
     NSLog(@"[MonitorTweak] loaded into %@", [[NSBundle mainBundle] bundleIdentifier]);
-    NSLog(@"[MonitorTweak] === AFTER FIRST LOG ===");
 
-    // Start TCP server immediately (pure POSIX, no ObjC runtime needed)
-    NSLog(@"[MonitorTweak] === BEFORE START SERVER ===");
-    [[SocketReporter shared] startServer];
-    NSLog(@"[MonitorTweak] === AFTER START SERVER ===");
+    NSLog(@"[MonitorTweak] === CTOR LINE 4 ===");
+    NSLog(@"[MonitorTweak] === CTOR LINE 5 ===");
 
-    // Privacy capture state (A/B): dedup set + launch timestamp for the native window.
-    gPrivacySeen     = [NSMutableSet set];
-    gPrivacyLaunchMs = msNow();
-
-    // ptrace bypass
-    MSHookFunction((void *)MSFindSymbol(NULL, "_ptrace"),
-                   (void *)new_ptrace, (void **)&orig_ptrace);
-
-    // Keychain C hooks
-    void *sec = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_LAZY);
-    if (sec) {
-        MSHookFunction((void *)SecItemCopyMatching,
-                       (void *)new_SecItemCopyMatching, (void **)&orig_SecItemCopyMatching);
-        MSHookFunction((void *)SecItemAdd,
-                       (void *)new_SecItemAdd,          (void **)&orig_SecItemAdd);
-        MSHookFunction((void *)SecItemUpdate,
-                       (void *)new_SecItemUpdate,       (void **)&orig_SecItemUpdate);
-        MSHookFunction((void *)SecItemDelete,
-                       (void *)new_SecItemDelete,       (void **)&orig_SecItemDelete);
-        dlclose(sec);
-    }
-
-    // ObjC hooks
-    %init;
-
-    NSLog(@"[MonitorTweak] === BEFORE SDK DETECTION ===");
-    // SDK detection after runtime settles
-    runSDKDetection();
+    // 完全不调用任何其他代码，只输出日志
     NSLog(@"[MonitorTweak] === CTOR END ===");
 }
