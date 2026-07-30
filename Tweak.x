@@ -587,21 +587,31 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
 
 %ctor {
     NSLog(@"[MonitorTweak] loaded into %@", [[NSBundle mainBundle] bundleIdentifier]);
+    NSLog(@"[MonitorTweak] step 1: starting server...");
 
     // Start TCP server immediately (pure POSIX, no ObjC runtime needed)
     [[SocketReporter shared] startServer];
+    NSLog(@"[MonitorTweak] step 2: server started");
 
     // Privacy capture state (A/B): dedup set + launch timestamp for the native window.
     gPrivacySeen     = [NSMutableSet set];
     gPrivacyLaunchMs = msNow();
+    NSLog(@"[MonitorTweak] step 3: privacy state initialized");
 
     // ptrace bypass
-    MSHookFunction((void *)MSFindSymbol(NULL, "_ptrace"),
-                   (void *)new_ptrace, (void **)&orig_ptrace);
+    NSLog(@"[MonitorTweak] step 4: hooking ptrace...");
+    void *ptraceSymbol = MSFindSymbol(NULL, "_ptrace");
+    NSLog(@"[MonitorTweak] step 4.1: ptrace symbol = %p", ptraceSymbol);
+    if (ptraceSymbol) {
+        MSHookFunction(ptraceSymbol, (void *)new_ptrace, (void **)&orig_ptrace);
+        NSLog(@"[MonitorTweak] step 4.2: ptrace hooked");
+    }
 
     // Keychain C hooks
+    NSLog(@"[MonitorTweak] step 5: hooking keychain...");
     void *sec = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_LAZY);
     if (sec) {
+        NSLog(@"[MonitorTweak] step 5.1: Security framework loaded");
         MSHookFunction((void *)SecItemCopyMatching,
                        (void *)new_SecItemCopyMatching, (void **)&orig_SecItemCopyMatching);
         MSHookFunction((void *)SecItemAdd,
@@ -611,10 +621,16 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
         MSHookFunction((void *)SecItemDelete,
                        (void *)new_SecItemDelete,       (void **)&orig_SecItemDelete);
         dlclose(sec);
+        NSLog(@"[MonitorTweak] step 5.2: keychain hooks installed");
+    } else {
+        NSLog(@"[MonitorTweak] step 5.1: Security framework load FAILED");
     }
 
     // ObjC hooks
+    NSLog(@"[MonitorTweak] step 6: calling %%init...");
     %init;
+    NSLog(@"[MonitorTweak] step 7: initialization complete");
+}
 
     // SDK detection after runtime settles
     runSDKDetection();
