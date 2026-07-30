@@ -630,7 +630,6 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
     NSLog(@"[MonitorTweak] step 6: calling %%init...");
     %init;
     NSLog(@"[MonitorTweak] step 7: initialization complete");
-}
 
     // SDK detection after runtime settles
     runSDKDetection();
