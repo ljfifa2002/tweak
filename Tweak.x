@@ -595,6 +595,16 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
     NSLog(@"[MonitorTweak] === CTOR LINE 4 ===");
     NSLog(@"[MonitorTweak] === CTOR LINE 5 ===");
 
-    // 完全不调用任何其他代码，只输出日志
+    // 调用 %init 避免编译警告
+    %init;
+
     NSLog(@"[MonitorTweak] === CTOR END ===");
+
+    // 调用这些函数避免 unused 警告
+    (void)new_ptrace;
+    (void)new_SecItemCopyMatching;
+    (void)new_SecItemAdd;
+    (void)new_SecItemUpdate;
+    (void)new_SecItemDelete;
+    (void)runSDKDetection;
 }
