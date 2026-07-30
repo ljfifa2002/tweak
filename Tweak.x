@@ -587,19 +587,48 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 %ctor {
-    // 先测试 syslog，不使用 NSLog
-    syslog(LOG_NOTICE, "[MonitorTweak] ctor line 1");
-    syslog(LOG_NOTICE, "[MonitorTweak] ctor line 2");
-    syslog(LOG_NOTICE, "[MonitorTweak] ctor line 3");
+    NSLog(@"[MonitorTweak] ctor START");
 
-    // 最后才使用 NSLog
-    NSLog(@"[MonitorTweak] loaded into tv.danmaku.bilianime");
+    NSLog(@"[MonitorTweak] loaded into %@", [[NSBundle mainBundle] bundleIdentifier]);
 
-    // 避免 unused 警告
-    (void)new_ptrace;
-    (void)new_SecItemCopyMatching;
-    (void)new_SecItemAdd;
-    (void)new_SecItemUpdate;
-    (void)new_SecItemDelete;
-    (void)runSDKDetection;
+    NSLog(@"[MonitorTweak] calling startServer");
+    [[SocketReporter shared] startServer];
+    NSLog(@"[MonitorTweak] startServer returned");
+
+    NSLog(@"[MonitorTweak] initializing globals");
+    gPrivacySeen = [NSMutableSet set];
+    gPrivacyLaunchMs = msNow();
+    NSLog(@"[MonitorTweak] globals initialized");
+
+    NSLog(@"[MonitorTweak] hooking ptrace");
+    MSHookFunction((void *)MSFindSymbol(NULL, "_ptrace"),
+                   (void *)new_ptrace, (void **)&orig_ptrace);
+    NSLog(@"[MonitorTweak] ptrace hooked");
+
+    NSLog(@"[MonitorTweak] hooking keychain");
+    void *sec = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_LAZY);
+    if (sec) {
+        MSHookFunction((void *)SecItemCopyMatching,
+                       (void *)new_SecItemCopyMatching, (void **)&orig_SecItemCopyMatching);
+        MSHookFunction((void *)SecItemAdd,
+                       (void *)new_SecItemAdd, (void **)&orig_SecItemAdd);
+        MSHookFunction((void *)SecItemUpdate,
+                       (void *)new_SecItemUpdate, (void **)&orig_SecItemUpdate);
+        MSHookFunction((void *)SecItemDelete,
+                       (void *)new_SecItemDelete, (void **)&orig_SecItemDelete);
+        dlclose(sec);
+        NSLog(@"[MonitorTweak] keychain hooked");
+    } else {
+        NSLog(@"[MonitorTweak] keychain dlopen failed");
+    }
+
+    NSLog(@"[MonitorTweak] calling %%init");
+    %init;
+    NSLog(@"[MonitorTweak] %%init completed");
+
+    NSLog(@"[MonitorTweak] calling runSDKDetection");
+    runSDKDetection();
+    NSLog(@"[MonitorTweak] runSDKDetection completed");
+
+    NSLog(@"[MonitorTweak] ctor END");
 }
