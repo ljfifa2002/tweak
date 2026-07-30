@@ -586,25 +586,53 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 %ctor {
-    NSLog(@"[MonitorTweak] === CTOR LINE 1 ===");
-    NSLog(@"[MonitorTweak] === CTOR LINE 2 ===");
-    NSLog(@"[MonitorTweak] === CTOR LINE 3 ===");
+    // 使用纯 C 日志，不依赖 NSLog
+    fprintf(stderr, "[MonitorTweak] ctor started\n");
+
+    NSLog(@"[MonitorTweak] NSLog test 1");
+    fprintf(stderr, "[MonitorTweak] after NSLog 1\n");
+
+    NSLog(@"[MonitorTweak] NSLog test 2");
+    fprintf(stderr, "[MonitorTweak] after NSLog 2\n");
 
     NSLog(@"[MonitorTweak] loaded into %@", [[NSBundle mainBundle] bundleIdentifier]);
+    fprintf(stderr, "[MonitorTweak] after bundle ID log\n");
 
-    NSLog(@"[MonitorTweak] === CTOR LINE 4 ===");
-    NSLog(@"[MonitorTweak] === CTOR LINE 5 ===");
+    // 启动服务器
+    fprintf(stderr, "[MonitorTweak] calling startServer\n");
+    [[SocketReporter shared] startServer];
+    fprintf(stderr, "[MonitorTweak] startServer returned\n");
 
-    // 调用 %init 避免编译警告
+    // 初始化全局变量
+    gPrivacySeen = [NSMutableSet set];
+    gPrivacyLaunchMs = msNow();
+    fprintf(stderr, "[MonitorTweak] globals initialized\n");
+
+    // Hook 函数
+    MSHookFunction((void *)MSFindSymbol(NULL, "_ptrace"),
+                   (void *)new_ptrace, (void **)&orig_ptrace);
+    fprintf(stderr, "[MonitorTweak] ptrace hooked\n");
+
+    // Keychain hooks
+    void *sec = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_LAZY);
+    if (sec) {
+        MSHookFunction((void *)SecItemCopyMatching,
+                       (void *)new_SecItemCopyMatching, (void **)&orig_SecItemCopyMatching);
+        MSHookFunction((void *)SecItemAdd,
+                       (void *)new_SecItemAdd, (void **)&orig_SecItemAdd);
+        MSHookFunction((void *)SecItemUpdate,
+                       (void *)new_SecItemUpdate, (void **)&orig_SecItemUpdate);
+        MSHookFunction((void *)SecItemDelete,
+                       (void *)new_SecItemDelete, (void **)&orig_SecItemDelete);
+        dlclose(sec);
+        fprintf(stderr, "[MonitorTweak] keychain hooked\n");
+    }
+
+    // ObjC hooks
     %init;
+    fprintf(stderr, "[MonitorTweak] %%init completed\n");
 
-    NSLog(@"[MonitorTweak] === CTOR END ===");
-
-    // 调用这些函数避免 unused 警告
-    (void)new_ptrace;
-    (void)new_SecItemCopyMatching;
-    (void)new_SecItemAdd;
-    (void)new_SecItemUpdate;
-    (void)new_SecItemDelete;
-    (void)runSDKDetection;
+    // SDK detection
+    runSDKDetection();
+    fprintf(stderr, "[MonitorTweak] ctor completed\n");
 }
