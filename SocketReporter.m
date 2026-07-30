@@ -47,9 +47,13 @@ static const NSUInteger kMaxQueue = 2000;
 }
 
 - (void)startServer {
+    NSLog(@"[MonitorTweak] SocketReporter startServer called");
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSLog(@"[MonitorTweak] SocketReporter dispatch block entered");
         [self _acceptLoop];
+        NSLog(@"[MonitorTweak] SocketReporter _acceptLoop returned");
     });
+    NSLog(@"[MonitorTweak] SocketReporter startServer dispatch scheduled");
 }
 
 // ── Private ─────────────────────────────────────────────────────────────────
@@ -98,11 +102,13 @@ static const NSUInteger kMaxQueue = 2000;
 }
 
 - (void)_acceptLoop {
+    NSLog(@"[MonitorTweak] _acceptLoop: starting");
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
         NSLog(@"[MonitorTweak] socket() failed");
         return;
     }
+    NSLog(@"[MonitorTweak] _acceptLoop: socket created fd=%d", fd);
     int on = 1;
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 
@@ -111,6 +117,7 @@ static const NSUInteger kMaxQueue = 2000;
     addr.sin_port        = htons(MONITOR_SOCKET_PORT);
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // 127.0.0.1 only
 
+    NSLog(@"[MonitorTweak] _acceptLoop: attempting bind on port %d", MONITOR_SOCKET_PORT);
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         NSLog(@"[MonitorTweak] bind() failed on port %d", MONITOR_SOCKET_PORT);
         close(fd);
