@@ -9,6 +9,7 @@ MonitorTweak_FRAMEWORKS = Foundation UIKit CoreLocation Contacts Photos \
                            AVFoundation AdSupport CoreTelephony WebKit
 MonitorTweak_CFLAGS = -fobjc-arc -fvisibility=hidden
 MonitorTweak_LDFLAGS = -lsubstrate
+MonitorTweak_CODESIGN_FLAGS = -S
 # No entitlements: iOS only honours the MAIN binary's entitlements, so signing an
 # injected dylib with them does nothing useful and trips AMFI ("has entitlements
 # but is not a main binary"). Theos default codesign (ldid -S fakesign, no
