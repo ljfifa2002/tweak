@@ -209,23 +209,6 @@ static void DebugLog(const char *fmt, ...) {
                 self.clientFd = clientFd;
                 DebugLog("[_acceptLoop] calling _flushToClient");
                 [self _flushToClient];
-
-                // Send initial ready message to confirm connection
-                NSDictionary *readyMsg = @{
-                    @"type": @"ready",
-                    @"timestamp": @((long long)([[NSDate date] timeIntervalSince1970] * 1000))
-                };
-                NSError *err = nil;
-                NSData *jsonData = [NSJSONSerialization dataWithJSONObject:readyMsg options:0 error:&err];
-                if (jsonData && !err) {
-                    NSMutableData *msgData = [NSMutableData dataWithData:jsonData];
-                    [msgData appendBytes:"\n" length:1];
-                    [self _writeData:msgData toFd:self.clientFd];
-                    DebugLog("[_acceptLoop] sent ready message");
-                } else {
-                    NSLog(@"[MonitorTweak] failed to create ready message: %@", err);
-                }
-
                 DebugLog("[_acceptLoop] _flushToClient returned");
             });
 
