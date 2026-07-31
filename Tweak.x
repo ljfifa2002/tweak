@@ -587,6 +587,7 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 %ctor {
+    syslog(LOG_NOTICE, "[MonitorTweak] %%ctor SYSLOG START - this should always appear");
     NSLog(@"[MonitorTweak] ctor START");
 
     NSLog(@"[MonitorTweak] loaded into %@", [[NSBundle mainBundle] bundleIdentifier]);
