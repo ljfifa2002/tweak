@@ -600,10 +600,11 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
     FileLog("%%ctor START");
     NSLog(@"[MonitorTweak] ctor START");
 
-    FileLog("calling startServer");
-    [[SocketReporter shared] startServer];
-    FileLog("startServer returned");
+    FileLog("skipping socket for diagnostic");
+    NSLog(@"[MonitorTweak] skipping socket");
 
-    NSLog(@"[MonitorTweak] ctor END - socket started");
+    // [[SocketReporter shared] startServer];
+
+    NSLog(@"[MonitorTweak] ctor END");
     FileLog("%%ctor END");
 }
