@@ -607,11 +607,3 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
     NSLog(@"[MonitorTweak] ctor END - socket started");
     FileLog("%%ctor END");
 }
-    NSLog(@"[MonitorTweak] startServer returned");
-
-    NSLog(@"[MonitorTweak] calling runSDKDetection");
-    runSDKDetection();
-    NSLog(@"[MonitorTweak] runSDKDetection completed");
-
-    NSLog(@"[MonitorTweak] ctor END");
-}
