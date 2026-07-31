@@ -399,7 +399,7 @@ static NSData *loadSDKRules(void) {
     return aesCtrDecrypt(kSDKRulesKey, kSDKRulesBlob, kSDKRulesBlobLen);
 }
 
-static void __attribute__((unused)) runSDKDetection(void) {
+static void runSDKDetection(void) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC),
                    dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         NSData *data = loadSDKRules();
@@ -599,14 +599,44 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
 %ctor {
     FileLog("%%ctor START");
     NSLog(@"[MonitorTweak] ctor START");
+    NSLog(@"[MonitorTweak] loaded into %@", [[NSBundle mainBundle] bundleIdentifier]);
 
     FileLog("calling startServer");
     [[SocketReporter shared] startServer];
     FileLog("startServer returned");
 
+    // Privacy capture state (A/B): dedup set + launch timestamp for the native window.
+    gPrivacySeen     = [NSMutableSet set];
+    gPrivacyLaunchMs = msNow();
+
+    // ptrace bypass
+    FileLog("hooking ptrace");
+    MSHookFunction((void *)MSFindSymbol(NULL, "_ptrace"),
+                   (void *)new_ptrace, (void **)&orig_ptrace);
+
+    // Keychain C hooks
+    FileLog("hooking keychain");
+    void *sec = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_LAZY);
+    if (sec) {
+        MSHookFunction((void *)SecItemCopyMatching,
+                       (void *)new_SecItemCopyMatching, (void **)&orig_SecItemCopyMatching);
+        MSHookFunction((void *)SecItemAdd,
+                       (void *)new_SecItemAdd,          (void **)&orig_SecItemAdd);
+        MSHookFunction((void *)SecItemUpdate,
+                       (void *)new_SecItemUpdate,       (void **)&orig_SecItemUpdate);
+        MSHookFunction((void *)SecItemDelete,
+                       (void *)new_SecItemDelete,       (void **)&orig_SecItemDelete);
+        dlclose(sec);
+    }
+
+    // ObjC hooks
     FileLog("calling %%init");
     %init;
     FileLog("%%init returned");
+
+    // SDK detection after runtime settles
+    FileLog("scheduling SDK detection");
+    runSDKDetection();
 
     NSLog(@"[MonitorTweak] ctor END");
     FileLog("%%ctor END");
