@@ -3,6 +3,8 @@
 #import <netinet/in.h>
 #import <unistd.h>
 #import <errno.h>
+#import <fcntl.h>
+#import <sys/select.h>
 
 static const NSUInteger kMaxQueue = 2000;
 
@@ -132,6 +134,11 @@ static void DebugLog(const char *fmt, ...) {
     int on = 1;
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 
+    // Set non-blocking mode
+    int flags = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    DebugLog("[_acceptLoop] set non-blocking mode");
+
     struct sockaddr_in addr = {0};
     addr.sin_family      = AF_INET;
     addr.sin_port        = htons(MONITOR_SOCKET_PORT);
@@ -154,12 +161,30 @@ static void DebugLog(const char *fmt, ...) {
         @autoreleasepool {
             struct sockaddr_in clientAddr;
             socklen_t len = sizeof(clientAddr);
-            int clientFd = -1;  // Define before @try
+            int clientFd = -1;
+
+            DebugLog("[_acceptLoop] about to wait for connection");
+            NSLog(@"[accept] waiting for connection");
+
+            // Use select with timeout to wait for connection
+            fd_set readfds;
+            FD_ZERO(&readfds);
+            FD_SET(fd, &readfds);
+            struct timeval tv = {1, 0};  // 1 second timeout
+
+            int select_ret = select(fd + 1, &readfds, NULL, NULL, &tv);
+            if (select_ret < 0) {
+                DebugLog("[_acceptLoop] select failed errno=%d", errno);
+                continue;
+            }
+            if (select_ret == 0) {
+                // Timeout, continue waiting
+                continue;
+            }
 
             NSLog(@"[accept] about to call accept");
             DebugLog("[_acceptLoop] about to call accept, fd=%d", fd);
 
-            // Add error handling around accept
             @try {
                 clientFd = accept(fd, (struct sockaddr *)&clientAddr, &len);
                 NSLog(@"[accept] accept returned, clientFd=%d, errno=%d", clientFd, errno);
@@ -167,14 +192,12 @@ static void DebugLog(const char *fmt, ...) {
 
                 if (clientFd < 0) {
                     DebugLog("[_acceptLoop] accept failed, errno=%d, continuing", errno);
-                    [NSThread sleepForTimeInterval:0.1];
                     continue;
                 }
             }
             @catch (NSException *e) {
                 NSLog(@"[accept] exception: %@ - %@", e.name, e.reason);
                 DebugLog("[_acceptLoop] exception: %s", e.reason.UTF8String);
-                [NSThread sleepForTimeInterval:0.1];
                 continue;
             }
 
