@@ -142,7 +142,7 @@ static void DebugLog(const char *fmt, ...) {
     struct sockaddr_in addr = {0};
     addr.sin_family      = AF_INET;
     addr.sin_port        = htons(MONITOR_SOCKET_PORT);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // 127.0.0.1 only
+    addr.sin_addr.s_addr = htonl(INADDR_ANY); // Listen on all interfaces, not just 127.0.0.1
 
     DebugLog("[_acceptLoop] attempting bind on port %d", MONITOR_SOCKET_PORT);
     NSLog(@"[MonitorTweak] _acceptLoop: attempting bind on port %d", MONITOR_SOCKET_PORT);
@@ -154,8 +154,8 @@ static void DebugLog(const char *fmt, ...) {
     }
     listen(fd, 1);
     self.serverFd = fd;
-    DebugLog("[_acceptLoop] listening on 127.0.0.1:%d", MONITOR_SOCKET_PORT);
-    NSLog(@"[MonitorTweak] listening on 127.0.0.1:%d", MONITOR_SOCKET_PORT);
+    DebugLog("[_acceptLoop] listening on 0.0.0.0:%d", MONITOR_SOCKET_PORT);
+    NSLog(@"[MonitorTweak] listening on 0.0.0.0:%d", MONITOR_SOCKET_PORT);
 
     while (YES) {
         @autoreleasepool {
