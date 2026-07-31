@@ -156,15 +156,23 @@ static void DebugLog(const char *fmt, ...) {
             socklen_t len = sizeof(clientAddr);
             NSLog(@"[accept] about to call accept");
             DebugLog("[_acceptLoop] about to call accept, fd=%d", fd);
-            fflush(NULL);
 
-            int clientFd = accept(fd, (struct sockaddr *)&clientAddr, &len);
-            NSLog(@"[accept] accept returned, clientFd=%d, errno=%d", clientFd, errno);
-            DebugLog("[_acceptLoop] accept returned, clientFd=%d, errno=%d", clientFd, errno);
-            fflush(NULL);
+            // Add error handling around accept
+            @try {
+                int clientFd = accept(fd, (struct sockaddr *)&clientAddr, &len);
+                NSLog(@"[accept] accept returned, clientFd=%d, errno=%d", clientFd, errno);
+                DebugLog("[_acceptLoop] accept returned, clientFd=%d, errno=%d", clientFd, errno);
 
-            if (clientFd < 0) {
-                DebugLog("[_acceptLoop] accept failed, errno=%d, continuing", errno);
+                if (clientFd < 0) {
+                    DebugLog("[_acceptLoop] accept failed, errno=%d, continuing", errno);
+                    [NSThread sleepForTimeInterval:0.1];
+                    continue;
+                }
+            }
+            @catch (NSException *e) {
+                NSLog(@"[accept] exception: %@ - %@", e.name, e.reason);
+                DebugLog("[_acceptLoop] exception: %s", e.reason.UTF8String);
+                [NSThread sleepForTimeInterval:0.1];
                 continue;
             }
 
