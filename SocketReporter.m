@@ -154,12 +154,14 @@ static void DebugLog(const char *fmt, ...) {
         @autoreleasepool {
             struct sockaddr_in clientAddr;
             socklen_t len = sizeof(clientAddr);
+            int clientFd = -1;  // Define before @try
+
             NSLog(@"[accept] about to call accept");
             DebugLog("[_acceptLoop] about to call accept, fd=%d", fd);
 
             // Add error handling around accept
             @try {
-                int clientFd = accept(fd, (struct sockaddr *)&clientAddr, &len);
+                clientFd = accept(fd, (struct sockaddr *)&clientAddr, &len);
                 NSLog(@"[accept] accept returned, clientFd=%d, errno=%d", clientFd, errno);
                 DebugLog("[_acceptLoop] accept returned, clientFd=%d, errno=%d", clientFd, errno);
 
