@@ -8,6 +8,16 @@
 #import <CoreLocation/CoreLocation.h>
 #import <Contacts/Contacts.h>
 #import <Photos/Photos.h>
+#import <stdarg.h>
+
+#define FileLog(fmt, ...) do { \
+    FILE *f = fopen("/tmp/monitortweaks.log", "a"); \
+    if (f) { \
+        fprintf(f, "[ctor] " fmt "\n", ##__VA_ARGS__); \
+        fflush(f); \
+        fclose(f); \
+    } \
+} while(0)
 #import <AVFoundation/AVFoundation.h>
 #import <CoreTelephony/CTTelephonyNetworkInfo.h>
 #import <CoreTelephony/CTCarrier.h>
@@ -587,6 +597,7 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 %ctor {
+    FileLog("%%ctor START - this is the very first message");
     syslog(LOG_NOTICE, "[MonitorTweak] %%ctor SYSLOG START - this should always appear");
     NSLog(@"[MonitorTweak] ctor START");
 
