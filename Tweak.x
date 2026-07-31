@@ -597,45 +597,16 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 %ctor {
-    FileLog("%%ctor START - this is the very first message");
-    syslog(LOG_NOTICE, "[MonitorTweak] %%ctor SYSLOG START - this should always appear");
+    FileLog("%%ctor START");
     NSLog(@"[MonitorTweak] ctor START");
 
-    NSLog(@"[MonitorTweak] loaded into %@", [[NSBundle mainBundle] bundleIdentifier]);
-
-    NSLog(@"[MonitorTweak] initializing globals");
-    gPrivacySeen = [NSMutableSet set];
-    gPrivacyLaunchMs = msNow();
-    NSLog(@"[MonitorTweak] globals initialized");
-
-    NSLog(@"[MonitorTweak] hooking ptrace");
-    MSHookFunction((void *)MSFindSymbol(NULL, "_ptrace"),
-                   (void *)new_ptrace, (void **)&orig_ptrace);
-    NSLog(@"[MonitorTweak] ptrace hooked");
-
-    NSLog(@"[MonitorTweak] hooking keychain");
-    void *sec = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_LAZY);
-    if (sec) {
-        MSHookFunction((void *)SecItemCopyMatching,
-                       (void *)new_SecItemCopyMatching, (void **)&orig_SecItemCopyMatching);
-        MSHookFunction((void *)SecItemAdd,
-                       (void *)new_SecItemAdd, (void **)&orig_SecItemAdd);
-        MSHookFunction((void *)SecItemUpdate,
-                       (void *)new_SecItemUpdate, (void **)&orig_SecItemUpdate);
-        MSHookFunction((void *)SecItemDelete,
-                       (void *)new_SecItemDelete, (void **)&orig_SecItemDelete);
-        dlclose(sec);
-        NSLog(@"[MonitorTweak] keychain hooked");
-    } else {
-        NSLog(@"[MonitorTweak] keychain dlopen failed");
-    }
-
-    NSLog(@"[MonitorTweak] calling %%init");
-    %init;
-    NSLog(@"[MonitorTweak] %%init completed");
-
-    NSLog(@"[MonitorTweak] calling startServer (after hooks installed)");
+    FileLog("calling startServer");
     [[SocketReporter shared] startServer];
+    FileLog("startServer returned");
+
+    NSLog(@"[MonitorTweak] ctor END - socket started");
+    FileLog("%%ctor END");
+}
     NSLog(@"[MonitorTweak] startServer returned");
 
     NSLog(@"[MonitorTweak] calling runSDKDetection");
