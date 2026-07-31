@@ -204,24 +204,55 @@ static void DebugLog(const char *fmt, ...) {
             DebugLog("[_acceptLoop] client connected, fd=%d", clientFd);
             NSLog(@"[MonitorTweak] pecker-agent connected fd=%d", clientFd);
 
-            dispatch_sync(self.ioQueue, ^{
-                if (self.clientFd >= 0) close(self.clientFd);
-                self.clientFd = clientFd;
-                DebugLog("[_acceptLoop] calling _flushToClient");
-                [self _flushToClient];
-                DebugLog("[_acceptLoop] _flushToClient returned");
+            // Handle client in background so accept loop can continue
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                dispatch_sync(self.ioQueue, ^{
+                    if (self.clientFd >= 0) {
+                        close(self.clientFd);
+                        DebugLog("[_acceptLoop] closed previous client");
+                    }
+                    self.clientFd = clientFd;
+                    DebugLog("[_acceptLoop] calling _flushToClient");
+                    [self _flushToClient];
+
+                    // Send initial behavior message to confirm connection
+                    NSDictionary *readyMsg = @{
+                        @"type": @"behavior",
+                        @"desc": @"MonitorTweak loaded",
+                        @"timestamp": @((long long)([[NSDate date] timeIntervalSince1970] * 1000)),
+                        @"packageName": [[NSBundle mainBundle] bundleIdentifier] ?: @""
+                    };
+                    NSError *err = nil;
+                    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:readyMsg options:0 error:&err];
+                    if (jsonData && !err) {
+                        NSMutableData *msgData = [NSMutableData dataWithData:jsonData];
+                        [msgData appendBytes:"\n" length:1];
+                        if ([self _writeData:msgData toFd:self.clientFd]) {
+                            DebugLog("[_acceptLoop] sent ready behavior message");
+                        } else {
+                            DebugLog("[_acceptLoop] failed to send ready message");
+                        }
+                    } else {
+                        NSLog(@"[MonitorTweak] failed to create ready message: %@", err);
+                    }
+
+                    DebugLog("[_acceptLoop] _flushToClient returned");
+                });
+
+                // Wait for client disconnect in background
+                DebugLog("[_acceptLoop] waiting for client disconnect, clientFd=%d", clientFd);
+                while (YES) {
+                    dispatch_sync(self.ioQueue, ^{});
+                    if (self.clientFd != clientFd || self.clientFd < 0) {
+                        DebugLog("[_acceptLoop] client disconnected or replaced, fd=%d", clientFd);
+                        break;
+                    }
+                    [NSThread sleepForTimeInterval:0.1];
+                }
+                DebugLog("[_acceptLoop] client handler exiting for fd=%d", clientFd);
             });
 
-            DebugLog("[_acceptLoop] waiting for client disconnect, clientFd=%d", self.clientFd);
-            while (YES) {
-                dispatch_sync(self.ioQueue, ^{});
-                if (self.clientFd < 0) {
-                    DebugLog("[_acceptLoop] client disconnected");
-                    break;
-                }
-                [NSThread sleepForTimeInterval:0.1];
-            }
-            DebugLog("[_acceptLoop] ready for next connection");
+            DebugLog("[_acceptLoop] ready for next connection immediately");
         }
     }
 }
