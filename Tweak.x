@@ -591,10 +591,6 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
 
     NSLog(@"[MonitorTweak] loaded into %@", [[NSBundle mainBundle] bundleIdentifier]);
 
-    NSLog(@"[MonitorTweak] calling startServer");
-    [[SocketReporter shared] startServer];
-    NSLog(@"[MonitorTweak] startServer returned");
-
     NSLog(@"[MonitorTweak] initializing globals");
     gPrivacySeen = [NSMutableSet set];
     gPrivacyLaunchMs = msNow();
@@ -625,6 +621,10 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
     NSLog(@"[MonitorTweak] calling %%init");
     %init;
     NSLog(@"[MonitorTweak] %%init completed");
+
+    NSLog(@"[MonitorTweak] calling startServer (after hooks installed)");
+    [[SocketReporter shared] startServer];
+    NSLog(@"[MonitorTweak] startServer returned");
 
     NSLog(@"[MonitorTweak] calling runSDKDetection");
     runSDKDetection();
