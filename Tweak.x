@@ -113,21 +113,21 @@ static SecItemAddFn          orig_SecItemAdd;
 static SecItemUpdateFn       orig_SecItemUpdate;
 static SecItemDeleteFn       orig_SecItemDelete;
 
-static OSStatus new_SecItemCopyMatching(CFDictionaryRef q, CFTypeRef *r) {
+static OSStatus __attribute__((unused)) new_SecItemCopyMatching(CFDictionaryRef q, CFTypeRef *r) {
     reportBehavior(@"SecItemCopyMatching",
         q ? [NSString stringWithFormat:@"%@", (__bridge NSDictionary *)q] : @"");
     return orig_SecItemCopyMatching(q, r);
 }
-static OSStatus new_SecItemAdd(CFDictionaryRef a, CFTypeRef *r) {
+static OSStatus __attribute__((unused)) new_SecItemAdd(CFDictionaryRef a, CFTypeRef *r) {
     reportBehavior(@"SecItemAdd",
         a ? [NSString stringWithFormat:@"%@", (__bridge NSDictionary *)a] : @"");
     return orig_SecItemAdd(a, r);
 }
-static OSStatus new_SecItemUpdate(CFDictionaryRef q, CFDictionaryRef upd) {
+static OSStatus __attribute__((unused)) new_SecItemUpdate(CFDictionaryRef q, CFDictionaryRef upd) {
     reportBehavior(@"SecItemUpdate", @"");
     return orig_SecItemUpdate(q, upd);
 }
-static OSStatus new_SecItemDelete(CFDictionaryRef q) {
+static OSStatus __attribute__((unused)) new_SecItemDelete(CFDictionaryRef q) {
     reportBehavior(@"SecItemDelete", @"");
     return orig_SecItemDelete(q);
 }
@@ -136,7 +136,7 @@ static OSStatus new_SecItemDelete(CFDictionaryRef q) {
 
 typedef int (*ptrace_fn)(int, pid_t, caddr_t, int);
 static ptrace_fn orig_ptrace;
-static int new_ptrace(int req, pid_t pid, caddr_t addr, int data) {
+static int __attribute__((unused)) new_ptrace(int req, pid_t pid, caddr_t addr, int data) {
     if (req == 31) return 0; // PT_DENY_ATTACH → no-op
     return orig_ptrace(req, pid, addr, data);
 }
@@ -399,7 +399,7 @@ static NSData *loadSDKRules(void) {
     return aesCtrDecrypt(kSDKRulesKey, kSDKRulesBlob, kSDKRulesBlobLen);
 }
 
-static void runSDKDetection(void) {
+static void __attribute__((unused)) runSDKDetection(void) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC),
                    dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         NSData *data = loadSDKRules();
