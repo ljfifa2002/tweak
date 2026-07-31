@@ -604,9 +604,9 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
     [[SocketReporter shared] startServer];
     FileLog("startServer returned");
 
-    FileLog("calling %init");
+    FileLog("calling %%init");
     %init;
-    FileLog("%init returned");
+    FileLog("%%init returned");
 
     NSLog(@"[MonitorTweak] ctor END");
     FileLog("%%ctor END");
