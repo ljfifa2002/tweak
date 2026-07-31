@@ -153,21 +153,31 @@ static void DebugLog(const char *fmt, ...) {
     while (YES) {
         struct sockaddr_in clientAddr;
         socklen_t len = sizeof(clientAddr);
+        DebugLog("[_acceptLoop] calling accept...");
         int clientFd = accept(fd, (struct sockaddr *)&clientAddr, &len);
-        if (clientFd < 0) continue;
+        if (clientFd < 0) {
+            DebugLog("[_acceptLoop] accept failed errno=%d", errno);
+            continue;
+        }
 
+        DebugLog("[_acceptLoop] client connected, fd=%d", clientFd);
         NSLog(@"[MonitorTweak] pecker-agent connected");
         dispatch_sync(self.ioQueue, ^{
             if (self.clientFd >= 0) close(self.clientFd);
             self.clientFd = clientFd;
+            DebugLog("[_acceptLoop] flushing queued data to client");
             // Drain queued events to new client immediately
             [self _flushToClient];
         });
 
         // Wait until this client disconnects (detect via write failure in _flushToClient)
+        DebugLog("[_acceptLoop] waiting for client disconnect");
         while (YES) {
             dispatch_sync(self.ioQueue, ^{});  // spin on ioQueue to detect disconnect
-            if (self.clientFd < 0) break;
+            if (self.clientFd < 0) {
+                DebugLog("[_acceptLoop] client disconnected");
+                break;
+            }
             [NSThread sleepForTimeInterval:0.1];
         }
         NSLog(@"[MonitorTweak] waiting for next connection");
