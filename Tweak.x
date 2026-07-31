@@ -13,7 +13,11 @@
 #define FileLog(fmt, ...) do { \
     FILE *f = fopen("/tmp/monitortweaks.log", "a"); \
     if (f) { \
-        fprintf(f, "[ctor] " fmt "\n", ##__VA_ARGS__); \
+        time_t now = time(NULL); \
+        struct tm *t = localtime(&now); \
+        fprintf(f, "%04d-%02d-%02d %02d:%02d:%02d [ctor] " fmt "\n", \
+                t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, \
+                t->tm_hour, t->tm_min, t->tm_sec, ##__VA_ARGS__); \
         fflush(f); \
         fclose(f); \
     } \
