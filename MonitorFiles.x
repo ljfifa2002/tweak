@@ -1,42 +1,43 @@
 #import "SocketReporter.h"
 #import <Foundation/Foundation.h>
 
+// 文件读写 hook 全部关闭（高频缓存 I/O 拖慢 WDA，且读写不涉个人采集）- 2026-08-13
+// 以下辅助函数（isAppPath/msNow2/reportFile）随 hook 一并停用，全部注释。
+
 // App-container path filter — same as hook_ios.js
-static BOOL isAppPath(NSString *path) {
-    if (!path) return NO;
-    NSArray *prefixes = @[
-        @"/var/mobile/Containers/Data/Application/",
-        @"/var/mobile/Containers/Shared/AppGroup/",
-        @"/private/var/mobile/Containers/Data/Application/",
-        @"/private/var/mobile/Containers/Shared/AppGroup/",
-    ];
-    for (NSString *pfx in prefixes) {
-        if ([path hasPrefix:pfx]) return YES;
-    }
-    return NO;
-}
+// static BOOL isAppPath(NSString *path) {
+//     if (!path) return NO;
+//     NSArray *prefixes = @[
+//         @"/var/mobile/Containers/Data/Application/",
+//         @"/var/mobile/Containers/Shared/AppGroup/",
+//         @"/private/var/mobile/Containers/Data/Application/",
+//         @"/private/var/mobile/Containers/Shared/AppGroup/",
+//     ];
+//     for (NSString *pfx in prefixes) {
+//         if ([path hasPrefix:pfx]) return YES;
+//     }
+//     return NO;
+// }
 
-static long long msNow2(void) {
-    return (long long)([[NSDate date] timeIntervalSince1970] * 1000);
-}
+// static long long msNow2(void) {
+//     return (long long)([[NSDate date] timeIntervalSince1970] * 1000);
+// }
 
-static void reportFile(NSString *method, NSString *path, NSString *flag) {
-    if (!isAppPath(path)) return;
-    // Write and read hooks disabled — high-frequency cache I/O degrades WDA responsiveness.
-    if ([flag isEqualToString:@"writesdcard"] || [flag isEqualToString:@"readsdcard"]) return;
-    [[SocketReporter shared] sendDict:@{
-        @"type":        @"behavior",
-        @"method":      method,
-        @"data":        path.length > 200 ? [path substringToIndex:200] : path,
-        @"stack":       @"",
-        @"privacyFlag": @"",
-        @"scene":       @"NORMAL",
-        @"timestamp":   @(msNow2()),
-    }];
-}
+// static void reportFile(NSString *method, NSString *path, NSString *flag) {
+//     if (!isAppPath(path)) return;
+//     if ([flag isEqualToString:@"writesdcard"] || [flag isEqualToString:@"readsdcard"]) return;
+//     [[SocketReporter shared] sendDict:@{
+//         @"type":        @"behavior",
+//         @"method":      method,
+//         @"data":        path.length > 200 ? [path substringToIndex:200] : path,
+//         @"stack":       @"",
+//         @"privacyFlag": @"",
+//         @"scene":       @"NORMAL",
+//         @"timestamp":   @(msNow2()),
+//     }];
+// }
 
 // ── NSFileHandle ──────────────────────────────────────────────────────────────
-// 文件读写 hook 全部关闭（高频缓存 I/O 拖慢 WDA，且读写不涉个人采集）- 2026-08-13
 
 // %hook NSFileHandle
 // + (id)fileHandleForReadingAtPath:(NSString *)path {
