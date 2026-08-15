@@ -115,14 +115,14 @@ static void reportNetwork(NSString *method, NSString *url,
 // ── Keychain C-function hooks (MSHookFunction) ────────────────────────────────
 
 typedef OSStatus (*SecItemCopyMatchingFn)(CFDictionaryRef, CFTypeRef *);
-typedef OSStatus (*SecItemAddFn)(CFDictionaryRef, CFTypeRef *);
-typedef OSStatus (*SecItemUpdateFn)(CFDictionaryRef, CFDictionaryRef);
-typedef OSStatus (*SecItemDeleteFn)(CFDictionaryRef);
+// typedef OSStatus (*SecItemAddFn)(CFDictionaryRef, CFTypeRef *);          // 写钥匙串 已关闭
+// typedef OSStatus (*SecItemUpdateFn)(CFDictionaryRef, CFDictionaryRef);   // 更新钥匙串 已关闭
+// typedef OSStatus (*SecItemDeleteFn)(CFDictionaryRef);                    // 删钥匙串 已关闭
 
 static SecItemCopyMatchingFn orig_SecItemCopyMatching;
-static SecItemAddFn          orig_SecItemAdd;
-static SecItemUpdateFn       orig_SecItemUpdate;
-static SecItemDeleteFn       orig_SecItemDelete;
+// static SecItemAddFn          orig_SecItemAdd;
+// static SecItemUpdateFn       orig_SecItemUpdate;
+// static SecItemDeleteFn       orig_SecItemDelete;
 
 static OSStatus __attribute__((unused)) new_SecItemCopyMatching(CFDictionaryRef q, CFTypeRef *r) {
     reportBehavior(@"SecItemCopyMatching",
