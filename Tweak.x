@@ -70,6 +70,13 @@ static NSSet *behaviorBlacklist(void) {
             @"NSFileHandle.read",
             @"NSData.read",
             @"NSFileManager.read",
+            @"UIPasteboard.setString",              // 写剪贴板 不涉个人采集 - 2026-08-13
+            @"UIPasteboard.setItems",               // 写剪贴板 不涉个人采集
+            @"PHPhotoLibrary.performChanges",       // 写相册 不涉个人采集
+            @"PHPhotoLibrary.performChangesAndWait",// 写相册 不涉个人采集
+            @"SecItemAdd",                   // 写钥匙串 不涉个人采集
+            @"SecItemUpdate",                // 更新钥匙串 不涉个人采集
+            @"SecItemDelete",                // 删钥匙串 不涉个人采集
             nil];
     });
     return s;
@@ -122,18 +129,30 @@ static OSStatus __attribute__((unused)) new_SecItemCopyMatching(CFDictionaryRef 
         q ? [NSString stringWithFormat:@"%@", (__bridge NSDictionary *)q] : @"");
     return orig_SecItemCopyMatching(q, r);
 }
-static OSStatus __attribute__((unused)) new_SecItemAdd(CFDictionaryRef a, CFTypeRef *r) {
-    reportBehavior(@"SecItemAdd",
-        a ? [NSString stringWithFormat:@"%@", (__bridge NSDictionary *)a] : @"");
-    return orig_SecItemAdd(a, r);
-}
-static OSStatus __attribute__((unused)) new_SecItemUpdate(CFDictionaryRef q, CFDictionaryRef upd) {
-    reportBehavior(@"SecItemUpdate", @"");
-    return orig_SecItemUpdate(q, upd);
-}
-static OSStatus __attribute__((unused)) new_SecItemDelete(CFDictionaryRef q) {
-    reportBehavior(@"SecItemDelete", @"");
-    return orig_SecItemDelete(q);
+// static OSStatus __attribute__((unused)) new_SecItemAdd(CFDictionaryRef a, CFTypeRef *r) {   // 写钥匙串 已关闭 - 2026-08-13
+//     reportBehavior(@"SecItemAdd",
+//         a ? [NSString stringWithFormat:@"%@", (__bridge NSDictionary *)a] : @"");
+//     return orig_SecItemAdd(a, r);
+// }
+// static OSStatus __attribute__((unused)) new_SecItemUpdate(CFDictionaryRef q, CFDictionaryRef upd) {
+//     reportBehavior(@"SecItemUpdate", @"");
+//     return orig_SecItemUpdate(q, upd);
+// }
+// static OSStatus __attribute__((unused)) new_SecItemDelete(CFDictionaryRef q) {
+//     reportBehavior(@"SecItemDelete", @"");
+//     return orig_SecItemDelete(q);
+// }
+
+// ── WiFi SSID (SystemConfiguration C function) ────────────────────────────────
+
+typedef CFDictionaryRef (*CNCopyCurrentNetworkInfoFn)(CFStringRef);
+static CNCopyCurrentNetworkInfoFn orig_CNCopyCurrentNetworkInfo;
+
+static CFDictionaryRef __attribute__((unused)) new_CNCopyCurrentNetworkInfo(CFStringRef iface) {
+    CFDictionaryRef r = orig_CNCopyCurrentNetworkInfo(iface);
+    if (r) reportBehavior(@"CNCopyCurrentNetworkInfo",
+        [NSString stringWithFormat:@"%@", (__bridge NSDictionary *)r]);
+    return r;
 }
 
 // ── ptrace bypass ─────────────────────────────────────────────────────────────
@@ -159,6 +178,26 @@ static int __attribute__((unused)) new_ptrace(int req, pid_t pid, caddr_t addr, 
 - (NSUUID *)identifierForVendor {
     NSUUID *r = %orig;
     reportBehavior(@"UIDevice.identifierForVendor", r.UUIDString ?: @"");
+    return r;
+}
+- (NSString *)name {
+    NSString *r = %orig;
+    reportBehavior(@"UIDevice.name", r ?: @"");
+    return r;
+}
+- (NSString *)model {
+    NSString *r = %orig;
+    reportBehavior(@"UIDevice.model", r ?: @"");
+    return r;
+}
+%end
+
+// ── 应用列表（私有API）──────────────────────────────────────────────────────
+%hook LSApplicationWorkspace
+- (NSArray *)allInstalledApplications {
+    NSArray *r = %orig;
+    reportBehavior(@"LSApplicationWorkspace.allInstalledApplications",
+        r ? [NSString stringWithFormat:@"count=%lu", (unsigned long)r.count] : @"");
     return r;
 }
 %end
@@ -218,6 +257,74 @@ static int __attribute__((unused)) new_ptrace(int req, pid_t pid, caddr_t addr, 
 - (NSArray *)containersMatchingPredicate:(id)p error:(NSError **)e {
     reportBehavior(@"CNContactStore.containersMatchingPredicate", @""); return %orig;
 }
+- (BOOL)enumerateContactsWithFetchRequest:(id)req error:(NSError **)e usingBlock:(id)block {
+    reportBehavior(@"CNContactStore.enumerateContacts", @"");
+    return %orig;
+}
+%end
+
+// ── Calendar / Health / Media / Speech 权限申请（官方核对补充 → 落地） ─────────
+
+%hook EKEventStore
+- (void)requestAccessToEntityType:(NSInteger)t completion:(id)h {
+    reportBehavior(@"EKEventStore.requestAccessToEntityType", @""); %orig;
+}
+- (void)requestFullAccessToEventsWithCompletion:(id)h {
+    reportBehavior(@"EKEventStore.requestFullAccessToEvents", @""); %orig;
+}
+%end
+
+%hook HKHealthStore
+- (void)requestAuthorizationToShareTypes:(id)share readTypes:(id)read completion:(id)h {
+    reportBehavior(@"HKHealthStore.requestAuthorizationToShareTypes", @""); %orig;
+}
+%end
+
+%hook MPMediaLibrary
++ (void)requestAuthorization:(id)h {
+    reportBehavior(@"MPMediaLibrary.requestAuthorization", @""); %orig;
+}
+%end
+
+%hook SFSpeechRecognizer
++ (void)requestAuthorization:(id)h {
+    reportBehavior(@"SFSpeechRecognizer.requestAuthorization", @""); %orig;
+}
+%end
+
+// ── Sensor / Motion / Bluetooth（官方核对补充 → 落地） ────────────────────────
+
+%hook CMMotionManager
+- (void)startAccelerometerUpdatesToQueue:(id)q withHandler:(id)h {
+    reportBehavior(@"CMMotionManager.startAccelerometerUpdates", @"加速度"); %orig;
+}
+- (void)startGyroUpdatesToQueue:(id)q withHandler:(id)h {
+    reportBehavior(@"CMMotionManager.startAccelerometerUpdates", @"陀螺仪"); %orig;
+}
+- (void)startMagnetometerUpdatesToQueue:(id)q withHandler:(id)h {
+    reportBehavior(@"CMMotionManager.startAccelerometerUpdates", @"磁力计"); %orig;
+}
+- (void)startDeviceMotionUpdatesToQueue:(id)q withHandler:(id)h {
+    reportBehavior(@"CMMotionManager.startAccelerometerUpdates", @"设备运动"); %orig;
+}
+%end
+
+%hook CMMotionActivityManager
+- (void)startActivityUpdatesToQueue:(id)q withHandler:(id)h {
+    reportBehavior(@"CMMotionActivityManager.queryActivityStarting", @""); %orig;
+}
+%end
+
+%hook CMPedometer
+- (void)startPedometerUpdatesFromDate:(id)d withHandler:(id)h {
+    reportBehavior(@"CMPedometer.queryPedometerData", @""); %orig;
+}
+%end
+
+%hook CBCentralManager
+- (void)scanForPeripheralsWithServices:(id)s options:(id)o {
+    reportBehavior(@"CBCentralManager.scanForPeripherals", @""); %orig;
+}
 %end
 
 // ── Camera / Microphone ───────────────────────────────────────────────────────
@@ -265,12 +372,12 @@ static int __attribute__((unused)) new_ptrace(int req, pid_t pid, caddr_t addr, 
 + (void)requestAuthorizationForAccessLevel:(NSInteger)l handler:(id)h {
     reportBehavior(@"PHPhotoLibrary.requestAuthorizationForAccessLevel", @""); %orig;
 }
-- (void)performChanges:(id)block completionHandler:(id)h {
-    reportBehavior(@"PHPhotoLibrary.performChanges", @""); %orig;
-}
-- (void)performChangesAndWait:(id)block error:(NSError **)e {
-    reportBehavior(@"PHPhotoLibrary.performChangesAndWait", @""); %orig;
-}
+// - (void)performChanges:(id)block completionHandler:(id)h {   // 写相册 不涉采集，已关闭 - 2026-08-13
+//     reportBehavior(@"PHPhotoLibrary.performChanges", @""); %orig;
+// }
+// - (void)performChangesAndWait:(id)block error:(NSError **)e {
+//     reportBehavior(@"PHPhotoLibrary.performChangesAndWait", @""); %orig;
+// }
 %end
 
 // Actual album reads — permission requests moved to the `permissions` flag, so these
@@ -297,10 +404,10 @@ static int __attribute__((unused)) new_ptrace(int req, pid_t pid, caddr_t addr, 
     if (r) reportBehavior(@"UIPasteboard.string", [r substringToIndex:MIN(200, r.length)]);
     return r;
 }
-- (void)setString:(NSString *)s {
-    if (s) reportBehavior(@"UIPasteboard.setString", [s substringToIndex:MIN(200, s.length)]);
-    %orig;
-}
+// - (void)setString:(NSString *)s {   // 写剪贴板 不涉采集，已关闭 - 2026-08-13
+//     if (s) reportBehavior(@"UIPasteboard.setString", [s substringToIndex:MIN(200, s.length)]);
+//     %orig;
+// }
 - (NSURL *)URL {
     NSURL *r = %orig;
     if (r) reportBehavior(@"UIPasteboard.URL", r.absoluteString ?: @"");
@@ -311,27 +418,13 @@ static int __attribute__((unused)) new_ptrace(int req, pid_t pid, caddr_t addr, 
     if (r) reportBehavior(@"UIPasteboard.items", @"");
     return r;
 }
-- (void)setItems:(NSArray *)items {
-    if (items) reportBehavior(@"UIPasteboard.setItems", @"");
-    %orig;
-}
+// - (void)setItems:(NSArray *)items {   // 写剪贴板 不涉采集，已关闭
+//     if (items) reportBehavior(@"UIPasteboard.setItems", @"");
+//     %orig;
+// }
 %end
 
-// ── SIM ───────────────────────────────────────────────────────────────────────
-
-%hook CTTelephonyNetworkInfo
-- (id)subscriberCellularProvider {
-    id r = %orig;
-    NSString *name = @"";
-    if ([r respondsToSelector:@selector(carrierName)]) name = [r carrierName] ?: @"";
-    reportBehavior(@"CTTelephonyNetworkInfo.subscriberCellularProvider", name);
-    return r;
-}
-- (id)serviceSubscriberCellularProviders {
-    reportBehavior(@"CTTelephonyNetworkInfo.serviceSubscriberCellularProviders", @"");
-    return %orig;
-}
-%end
+// ── SIM（已删除：运营商名非个人身份，不采集）- 2026-08-13 ─────────────────────
 
 // ── Network ───────────────────────────────────────────────────────────────────
 
@@ -624,13 +717,26 @@ static void collectViewText(UIView *v, NSMutableString *out, int depth) {
     if (sec) {
         MSHookFunction((void *)SecItemCopyMatching,
                        (void *)new_SecItemCopyMatching, (void **)&orig_SecItemCopyMatching);
-        MSHookFunction((void *)SecItemAdd,
-                       (void *)new_SecItemAdd,          (void **)&orig_SecItemAdd);
-        MSHookFunction((void *)SecItemUpdate,
-                       (void *)new_SecItemUpdate,       (void **)&orig_SecItemUpdate);
-        MSHookFunction((void *)SecItemDelete,
-                       (void *)new_SecItemDelete,       (void **)&orig_SecItemDelete);
+        // 写/更新/删钥匙串 已关闭 - 2026-08-13
+        // MSHookFunction((void *)SecItemAdd,
+        //                (void *)new_SecItemAdd,          (void **)&orig_SecItemAdd);
+        // MSHookFunction((void *)SecItemUpdate,
+        //                (void *)new_SecItemUpdate,       (void **)&orig_SecItemUpdate);
+        // MSHookFunction((void *)SecItemDelete,
+        //                (void *)new_SecItemDelete,       (void **)&orig_SecItemDelete);
         dlclose(sec);
+    }
+
+    // WiFi SSID (SystemConfiguration)
+    FileLog("hooking CNCopyCurrentNetworkInfo");
+    void *sc = dlopen("/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration", RTLD_LAZY);
+    if (sc) {
+        CNCopyCurrentNetworkInfoFn cncni = (CNCopyCurrentNetworkInfoFn)dlsym(sc, "CNCopyCurrentNetworkInfo");
+        if (cncni) {
+            MSHookFunction((void *)cncni,
+                           (void *)new_CNCopyCurrentNetworkInfo, (void **)&orig_CNCopyCurrentNetworkInfo);
+        }
+        dlclose(sc);
     }
 
     // ObjC hooks

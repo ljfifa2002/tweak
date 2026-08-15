@@ -36,52 +36,53 @@ static void reportFile(NSString *method, NSString *path, NSString *flag) {
 }
 
 // ── NSFileHandle ──────────────────────────────────────────────────────────────
+// 文件读写 hook 全部关闭（高频缓存 I/O 拖慢 WDA，且读写不涉个人采集）- 2026-08-13
 
-%hook NSFileHandle
-+ (id)fileHandleForReadingAtPath:(NSString *)path {
-    reportFile(@"NSFileHandle.read", path, @"readsdcard");
-    return %orig;
-}
-+ (id)fileHandleForWritingAtPath:(NSString *)path {
-    reportFile(@"NSFileHandle.write", path, @"writesdcard");
-    return %orig;
-}
-%end
+// %hook NSFileHandle
+// + (id)fileHandleForReadingAtPath:(NSString *)path {
+//     reportFile(@"NSFileHandle.read", path, @"readsdcard");
+//     return %orig;
+// }
+// + (id)fileHandleForWritingAtPath:(NSString *)path {
+//     reportFile(@"NSFileHandle.write", path, @"writesdcard");
+//     return %orig;
+// }
+// %end
 
 // ── NSData ────────────────────────────────────────────────────────────────────
 
-%hook NSData
-+ (id)dataWithContentsOfFile:(NSString *)path {
-    reportFile(@"NSData.read", path, @"readsdcard");
-    return %orig;
-}
-- (BOOL)writeToFile:(NSString *)path atomically:(BOOL)a {
-    reportFile(@"NSData.write", path, @"writesdcard");
-    return %orig;
-}
-%end
+// %hook NSData
+// + (id)dataWithContentsOfFile:(NSString *)path {
+//     reportFile(@"NSData.read", path, @"readsdcard");
+//     return %orig;
+// }
+// - (BOOL)writeToFile:(NSString *)path atomically:(BOOL)a {
+//     reportFile(@"NSData.write", path, @"writesdcard");
+//     return %orig;
+// }
+// %end
 
 // ── NSFileManager ─────────────────────────────────────────────────────────────
 
-%hook NSFileManager
-- (NSData *)contentsAtPath:(NSString *)path {
-    reportFile(@"NSFileManager.read", path, @"readsdcard");
-    return %orig;
-}
-- (BOOL)createFileAtPath:(NSString *)path contents:(NSData *)d attributes:(NSDictionary *)a {
-    reportFile(@"NSFileManager.write", path, @"writesdcard");
-    return %orig;
-}
-- (BOOL)removeItemAtPath:(NSString *)path error:(NSError **)e {
-    reportFile(@"NSFileManager.write", path, @"writesdcard");
-    return %orig;
-}
-- (BOOL)moveItemAtPath:(NSString *)src toPath:(NSString *)dst error:(NSError **)e {
-    reportFile(@"NSFileManager.write", src, @"writesdcard");
-    return %orig;
-}
-- (BOOL)copyItemAtPath:(NSString *)src toPath:(NSString *)dst error:(NSError **)e {
-    reportFile(@"NSFileManager.write", src, @"writesdcard");
-    return %orig;
-}
-%end
+// %hook NSFileManager
+// - (NSData *)contentsAtPath:(NSString *)path {
+//     reportFile(@"NSFileManager.read", path, @"readsdcard");
+//     return %orig;
+// }
+// - (BOOL)createFileAtPath:(NSString *)path contents:(NSData *)d attributes:(NSDictionary *)a {
+//     reportFile(@"NSFileManager.write", path, @"writesdcard");
+//     return %orig;
+// }
+// - (BOOL)removeItemAtPath:(NSString *)path error:(NSError **)e {
+//     reportFile(@"NSFileManager.write", path, @"writesdcard");
+//     return %orig;
+// }
+// - (BOOL)moveItemAtPath:(NSString *)src toPath:(NSString *)dst error:(NSError **)e {
+//     reportFile(@"NSFileManager.write", src, @"writesdcard");
+//     return %orig;
+// }
+// - (BOOL)copyItemAtPath:(NSString *)src toPath:(NSString *)dst error:(NSError **)e {
+//     reportFile(@"NSFileManager.write", src, @"writesdcard");
+//     return %orig;
+// }
+// %end
